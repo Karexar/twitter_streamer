@@ -1,0 +1,17 @@
+---
+path_config: "twitter/config.yaml"
+path_tweets: "tests/twitter/tweets/"
+loc_to_coords_src_path: "tests/twitter/data/loc_to_coords_src.txt"
+processed_tweets_ids_src_path: "tests/twitter/data/processed_ids_src.txt"
+
+overwrite:
+    # tweets
+    raw_tweets_stream_dir_path: "tests/twitter/input"
+    raw_tweets_search_dir_path: "tests/twitter/input"
+    processed_tweets_ids_path: "tests/twitter/data/processed_ids.txt"
+    out_dir_tweet_processing: "tests/twitter/out_process"
+    sg_users_count_path: "tests/twitter/data/sg_users_count.csv"
+    # geocoder
+    loc_to_coords_path: "tests/twitter/data/loc_to_coords.txt"
+    sg_users_last_path: "tests/twitter/sg_users_last.csv"
+...
