@@ -7,4 +7,4 @@ The csv file contains :
  - geographic source
  - tweet_id
 
-The pickle file contains tuples with the same information, but instead of the tweet id, the full tweet object is available. 
+The pickle file contains tuples with the same information, but instead of the tweet id, the full tweet object is available.

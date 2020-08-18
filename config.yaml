@@ -18,9 +18,9 @@ raw_tweets_search_dir_path: "raw_tweets_search"
 out_dir_tweet_processing: "out_process"
 # Path where to store the final list of Swiss-German sentences, along with
 # the full tweet object
-path_final_gsw_tweets: "final_dataset/gsw_tweets.pkl"
+path_dirty_gsw_tweets: "dirty_dataset/gsw_tweets.pkl"
 # Path where to store the final dataset containing all Swiss-German sentences.
-path_final_gsw_sentences: "final_dataset/gsw_sentences.csv"
+path_dirty_gsw_sentences: "dirty_dataset/gsw_sentences.csv"
 # Path of the file containing the ids of the tweets already processed
 processed_tweets_ids_path: "data/processed_ids.txt"
 # Path of the file containing the last tweet for each Swiss-German twitter user

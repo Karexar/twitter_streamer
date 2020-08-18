@@ -19,8 +19,8 @@ def main():
 
     print(datetime.datetime.now())
     print("Loading current dataset...")
-    current_final_tweets = load_obj(config["path_final_gsw_tweets"])
-    cur_sentences = pd.read_csv(config["path_final_gsw_sentences"])
+    current_final_tweets = load_obj(config["path_dirty_gsw_tweets"])
+    cur_sentences = pd.read_csv(config["path_dirty_gsw_sentences"])
     count90 = cur_sentences[cur_sentences["gsw_prediction"] >= 0.9].shape[0]
     count95 = cur_sentences[cur_sentences["gsw_prediction"] >= 0.95].shape[0]
     print(f"{count90} gsw sentences with prediction 0.9")

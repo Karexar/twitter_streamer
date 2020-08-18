@@ -31,3 +31,5 @@ __pycache__
 !/log/readme.md
 /final_dataset/*
 !/final_dataset/readme.md
+/dirty_dataset/*
+!/dirty_dataset/readme.md
