@@ -3,26 +3,24 @@
 # to have the useful and useless locations stored.
 
 # This file loads the twitter dataset and performs the following operations :
-#  1. Filter out all rows that are under the specified language identification
-#     threshold.
-#  2. Load the coords_to_state mapping object and create a column with the
+#  1. Load the coords_to_state mapping object and create a column with the
 #     cantons (states) from the coords column.
-#  3. Map the coords to dialect for the GPS dataset (i.e. the data points where
+#  2. Map the coords to dialect for the GPS dataset (i.e. the data points where
 #     coordinates are given by twitter).We take the dominant dialect for each
 #     user.
-#  4. Map the coord to canton for the IQ dataset (i.e. the data points where
+#  3. Map the coord to canton for the IQ dataset (i.e. the data points where
 #     coordinates are given by locationIQ).
-#  5. Load the useful and useless locations, ensure all locations in the dataset
+#  4. Load the useful and useless locations, ensure all locations in the dataset
 #     are included in one of the two files, and label (i.e. overwrite) as
 #     "Unknown" all locations that are useless (only for the iq dataset)
-#  6. Map each canton to the dialect (group of cantons) for the IQ dataset
-#  7. Keep a 'sentence', 'label', and 'user_id' column and merge the two
+#  5. Map each canton to the dialect (group of cantons) for the IQ dataset
+#  6. Keep a 'sentence', 'label', and 'user_id' column and merge the two
 #     datasets
-#  8. Split the dataset into labelled and unlabelled, save them on disk and
+#  7. Split the dataset into labelled and unlabelled, save them on disk and
 #     output aggregated data
 
 import pandas as pd
-import _thread
+#import _thread
 from utils.utils import *
 from pathlib import Path
 from twitter.geocoder import *
@@ -30,20 +28,12 @@ import os
 
 
 ###  Settings  #################################################################
-lid_threshold = 0.95
-config_path = "twitter/config.yaml"
-dataset_path = "twitter/final_dataset/gsw_tweets.pkl"
-useless_locs_path = "twitter/data/useless_locs.pkl"
-useful_locs_path = "twitter/data/useful_locs.pkl"
-label_corrections_path = "twitter/data/label_corrections.pkl"
-gsw_labelled_dir = "data/twitter/labelled"
-gsw_unlabelled_dir = "data/twitter/unlabelled"
-
-# this dataset will be used to test what is the best method to label users
-# for the self learning part. We will treat the training set as if it was
-# unlabelled, then predict the dialect for each user, then compare to the
-# real labels to see which user-labelling method works the best.
-gsw_fake_unlabelled_dir = "data/twitter/fake_unlabelled"
+config_path = "config.yaml"
+dataset_path = "dirty_dataset/gsw_tweets.pkl"
+useless_locs_path = "data/useless_locs.pkl"
+useful_locs_path = "data/useful_locs.pkl"
+label_corrections_path = "data/label_corrections.pkl"
+output_dir = "final_dataset"
 # the dominant threshold is the minimum proportion a dialect should have for a
 # given user to consider that the user is representative of the dialect.
 # This is relevant only when the location is the tweet location (geo_source =
@@ -62,7 +52,7 @@ def dominant_dialect(dialects):
     return None
 
 
-_thread.start_new_thread( keep_alive, tuple() )
+#_thread.start_new_thread( keep_alive, tuple() )
 
 Path(gsw_labelled_dir).mkdir(parents=True, exist_ok=True)
 Path(gsw_unlabelled_dir).mkdir(parents=True, exist_ok=True)
@@ -84,11 +74,6 @@ df = pd.DataFrame(lines, columns=["sentence",
 df["location"] = df["location"].map(lambda x: "" if x is None else str(x))
 df["location"] = df["location"].map(heavy_normalize_text)
 
-# Filter out rows that are under the specified language identification threshold
-print("Initial sentence count : " + str(df.shape[0]))
-df = df[df["prediction"] >= lid_threshold]
-print("Sentence count with lid prediction >= " + str(lid_threshold) + " : "
-      + str(df.shape[0]))
 
 # Load the mapping from coords to canton (state)
 coords_to_state_path = "twitter/data/coords_to_state.pkl"
@@ -141,12 +126,6 @@ print(f"Length unlabelled : {sum_unlabelled}")
 if sum_labelled + sum_unlabelled != df_gps.shape[0]:
     raise Exception(f"Wrong shapes : {sum_labelled} + {sum_unlabelled} != " +
                     f"{df_gps.shape[0]}")
-df_gps = df_gps.drop(["coords"], axis=1)
-df_gps = df_gps.drop(["prediction"], axis=1)
-df_gps = df_gps.drop(["geo_source"], axis=1)
-df_gps = df_gps.drop(["location"], axis=1)
-df_gps = df_gps.drop(["canton"], axis=1)
-df_gps = df_gps.rename(columns={"dialect": "label"})
 
 ### 'IQ' dataset, where coordinates are given by locationIQ ####################
 # map the coords to the corresponding canton
@@ -189,40 +168,14 @@ if sum_labelled + sum_unlabelled != df_iq.shape[0]:
     raise Exception(f"Wrong shapes : {sum_labelled} + {sum_unlabelled} != " +
                     f"{df_iq.shape[0]}")
 
-df_iq = df_iq.drop(["coords"], axis=1)
-df_iq = df_iq.drop(["prediction"], axis=1)
-df_iq = df_iq.drop(["geo_source"], axis=1)
-df_iq = df_iq.drop(["location"], axis=1)
-df_iq = df_iq.drop(["canton"], axis=1)
 df_iq = df_iq.drop(["useful"], axis=1)
-df_iq = df_iq.rename(columns={"dialect": "label"})
 
 # Merge the dataset
 df = pd.concat([df_gps, df_iq])
 
-# Split the dataset into a labelled and unlabelled set
-df_unlab = df[df["label"].isna()]
-df_lab = df.dropna(subset=["label"])
-if df_unlab.shape[0] + df_lab.shape[0] != df.shape[0]:
-    raise Exception(f"Wrong shapes : {df_unlab.shape[0]} + {df_lab.shape[0]} " +
-                    f" != {df.shape[0]}")
-# drop Fribourg
-df_lab = df_lab[df_lab["label"]!="RO"]
+df[df["dialect"].isna()]["dialect"] = "Unknown"
 
-# Save the fake unlabelled dataset
-path = os.path.join(gsw_fake_unlabelled_dir, "full.csv")
-df_lab.to_csv(path, sep="\t", header=False, index=False)
+if df.shape[0] != len(lines):
+    raise Exception("The output is not the same size as the input")
 
-df_lab = df_lab.drop(columns=["user_id"])
-print("***********************************************************************")
-print("Final dataset")
-print(f"Total length : {df.shape[0]}")
-print(f"Length labelled : {df_lab.shape[0]}")
-print(f"Length unlabelled : {df_unlab.shape[0]}")
-print("***********************************************************************")
-
-# Save on disk
-path = os.path.join(gsw_labelled_dir, "full.csv")
-df_lab.to_csv(path, sep="\t", header=False, index=False)
-path = os.path.join(gsw_unlabelled_dir, "full.csv")
-df_unlab.to_csv(path, sep="\t", header=False, index=False)
+df.to_csv("")

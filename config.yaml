@@ -29,6 +29,12 @@ sg_users_last_path: "data/sg_users_last.csv"
 sg_users_count_path: "data/sg_users_count.csv"
 # Threshold used for Swiss-German language identification using BERT
 lid_threshold: 0.9
+# minimum size of words containing only special chars to be removed
+min_char_special_group: 2
+
+# Max special chars a word can contain. If the limit is exceeded, the whole
+# sentence is dropped.
+max_special_char_in_word: 3
 # Threshold of the bert lid used for adding new Swiss-German twitter users.
 # This value should be higher than the preceding, because we don't want to add a
 # user if we are not sure he's Swiss-German.
@@ -39,7 +45,7 @@ gpu_index_to_use: 0
 keep_foreign_location: true
 # The minimum size of the location text field of twitter user account
 # Not used anymore, we keep all gsw tweets
-# min_location_length: 1
+min_location_length: 1
 
 # Specific twitter preprocessing, first elem is the pattern to find and second
 # elem is by what we want to replace the pattern. Note that this only to keep

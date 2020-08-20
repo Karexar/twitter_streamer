@@ -1,5 +1,5 @@
 import pytest
-from twitter.geocoder import *
+from geocoder import *
 from shutil import copyfile
 #import os
 #from utils.utils import *
@@ -38,7 +38,6 @@ def test_is_in_bounding_boxes(geocoder, point, boxes, expected):
 
 @pytest.mark.parametrize("text, expected",
     [("I LIVE in >>>Goûmoens'la-ville<<< !!!", "Goumoëns"),
-     ("1376, with my cows", "1376"),
      ("6.1376, 47.1376", None)])
 
 def test_get_ch_location(geocoder, text, expected):

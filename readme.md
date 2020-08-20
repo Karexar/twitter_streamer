@@ -63,6 +63,13 @@ There are three main processes that are designed to run simultaneously :
  python -m scripts.filter
  ```
 
+The output of these processes are pickle files in the *out_process* folder. To concatenate these files, you can use the *concat_out_process* script at any point.
+```zsh
+python -m scripts.concat_out_process
+```
+
+At this point, we have a *dirty dataset*, meaning that the geo-localisation is not verified, so the coordinates will be wrong for a non negligible amount of sentences. During the *filter* process, the *user.location* field of tweets is sent to a geocoder to try to retrieve the geo-localisation. The problem is that people tend to write crap in this field, so most of the time, this information is not usable. However the geocoder will try very hard to find a match in Switzerland, so the results are sometimes wrong and will need a manual check. Automating the geographic retrieval without mistakes would be very hard because of so much corner cases to take into account (context, different cities with same name, cities that have a meaning in another language...). Therefore, the *clean* folder contains three scripts to produce the final dataset. 
+
 ## Notes
 
 - Make sure the time is correct on your machine, otherwise you may encounter a twitter error 401 (unauthorized) when fetching tweets from specific users. Even with correct time, the error may still occur sometimes, and may corresponds to banned users for which we cannot fetch the history.

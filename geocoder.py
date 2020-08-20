@@ -50,6 +50,11 @@ class Geocoder:
     state_to_code["Neuchâtel"] = "NE"
     state_to_code["Geneva"] = "GE"
 
+    location_good_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    location_good_chars += "ÀÁÂÄÈÉÊËÍÌÎÏÓÒÔÖÚÙÛÜàáâäèéêëìíîïôöòóüùúûÿ"
+    location_good_chars += " -.0123456789&()/'"
+    location_good_chars = set(location_good_chars)
+
     @accepts(Any, Union[str, dict])
     @returns(None)
     def __init__(self, config):
@@ -242,8 +247,8 @@ class Geocoder:
         """
         # Remove special characters that should not appear in a location field
         query = normalize_text(query)
-        query = Cleaner.remove_wrong_chars(query)
-        query = re.sub(r"[^\w\s\.\,\-\\/\(\)\&\']", " ", query)
+        query = Cleaner.remove_not_good_chars(query,
+                                              Geocoder.location_good_chars)
         query = re.sub(r"[/\r?\n|\r/]", " ", query)
         query = Cleaner.clean_spaces(query)
         query = query.lower().strip()

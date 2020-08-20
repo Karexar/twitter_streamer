@@ -1,5 +1,5 @@
 ---
-path_config: "twitter/config.yaml"
+path_config: "config.yaml"
 path_tweets: "tests/twitter/tweets/"
 loc_to_coords_src_path: "tests/twitter/data/loc_to_coords_src.txt"
 processed_tweets_ids_src_path: "tests/twitter/data/processed_ids_src.txt"

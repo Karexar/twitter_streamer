@@ -44,17 +44,17 @@ import pandas as pd
 from utils.utils import *
 import os
 from tqdm import tqdm
-import _thread
+#import _thread
 
 ###  Settings  #################################################################
-dataset_path = "twitter/final_dataset/gsw_tweets.pkl"
-useless_locs_path = "twitter/data/useless_locs.pkl"
-useful_locs_path = "twitter/data/useful_locs.pkl"
-coords_to_state_path = "twitter/data/coords_to_state.pkl"
-label_corrections_path = "twitter/data/label_corrections.pkl"
+dataset_path = "dirty_dataset/gsw_tweets.pkl"
+useless_locs_path = "data/useless_locs.pkl"
+useful_locs_path = "data/useful_locs.pkl"
+coords_to_state_path = "data/coords_to_state.pkl"
+label_corrections_path = "data/label_corrections.pkl"
 ################################################################################
 
-_thread.start_new_thread( keep_alive, tuple() )
+#_thread.start_new_thread( keep_alive, tuple() )
 
 print("Loading the dataset...")
 data = load_obj(dataset_path)
@@ -121,9 +121,9 @@ for _, row in df.iterrows():
                 if action == "y":
                     useful_locs.add(location)
                     keep_going = False
-                elif action == "s":
-                    save_obj(useless_locs, useless_locs_path)
-                    save_obj(useful_locs, useful_locs_path)
+                #elif action == "s":
+                #    save_obj(useless_locs, useless_locs_path)
+                #    save_obj(useful_locs, useful_locs_path)
                 elif action == "n":
                     useless_locs.add(location)
                     keep_going = False
@@ -147,6 +147,8 @@ for _, row in df.iterrows():
                             useful_locs.add(location)
                             label_corrections[location] = ch_states[int(new_loc)-1]
                             save_obj(label_corrections, label_corrections_path)
+                save_obj(useless_locs, useless_locs_path)
+                save_obj(useful_locs, useful_locs_path)
             else:
                 print("Location or state not available")
                 print("Location : " + str(location))

@@ -1,5 +1,5 @@
 import pytest
-from twitter.tweet_filter import *
+from tweet_filter import *
 import os
 from utils.utils import *
 from pytest import approx
@@ -161,15 +161,20 @@ class Test_tweets:
                  [([(1, "RT @bou-boule, so what ?"),
                     (2, "MT http://test.com best website ever @bob"),
                     (3, "Hey #greetings how are you ?")],
-                   [(1, "so what ?"),
+                   [(1, "so what?"),
                     (2, "best website ever"),
-                    (3, "Hey how are you ?")]),
+                    (3, "Hey how are you?")]),
                    ([(13, "Hey @bill check this out https://a.io")],
                     [(13, "Hey check this out")]),
-                   ([], [])
+                   ([(1, "yop &gt; so ^dd"),
+                     (2, "hey :-) cool !!!! haha .....")],
+                    [(1, "yop so"),
+                     (2, "hey cool! haha...")]),
+                   ([], []),
                  ])
     def test_preprocess(self, test_input, expected, tweets_obj):
-        assert(tweets_obj._preprocess(test_input) == expected)
+        processed = tweets_obj._preprocess(test_input)
+        assert(processed == expected)
 
     @pytest.mark.parametrize("test_input,expected",
                  [([(1, "test     test"), # 2 tabs
@@ -198,6 +203,105 @@ class Test_tweets:
     def test_split_texts(self, test_input, expected, tweets_obj):
         assert(tweets_obj._split_texts(test_input) == expected)
 
+
+    @pytest.mark.parametrize("test_input,expected",
+                 [
+                   (# input
+                    [(1, "test  ¦   test"), # 2 tabs
+                    (2, "oil")],
+                    # expected
+                    [(2, "oil")]
+                   ),
+                   ([],
+                    [])
+                 ])
+    def test_remove_sentences_with_special_chars(self,
+                                                 test_input,
+                                                 expected):
+        res = TweetFilter._remove_sentences_with_special_chars(test_input)
+        assert(res == expected)
+
+
+    @pytest.mark.parametrize("test_input,expected,from_size",
+                 [
+                   (# input
+                    [(1, "test ^^   test  _ $__"), # 2 tabs
+                    (2, "oil$--$")],
+                    # expected
+                    [(1, "test test _"),
+                     (2, "oil$--$")],
+                     2
+                   ),
+                   ([],
+                    [],
+                    2)
+                 ])
+    def test_remove_groups_of_special_chars(self,
+                                            test_input,
+                                            expected,
+                                            from_size):
+        res = TweetFilter._remove_groups_of_special_chars(test_input, from_size)
+        assert(res == expected)
+
+
+    @pytest.mark.parametrize("test_input,expected, max_char",
+                 [
+                   (# input
+                    [(1, "(tes-t$) test"), # 2 tabs
+                     (2, "te$$st_")],
+                    # expected
+                    [(2, "te$$st_")],
+                     3
+                   ),
+                   ([],
+                    [],
+                    3)
+                 ])
+    def test_remove_sentences_with_special_words(self,
+                                                 test_input,
+                                                 expected,
+                                                 max_char):
+        res = TweetFilter._remove_sentences_with_special_words(test_input,
+                                                               max_char)
+        assert(res == expected)
+
+
+    @pytest.mark.parametrize("test_input,expected",
+                 [
+                   (# input
+                    [(1, "test ^ test _"), # 2 tabs
+                    (2, "oil+ +")],
+                    # expected
+                    [(1, "test test"),
+                     (2, "oil+")]
+                   ),
+                   ([],
+                    [])
+                 ])
+    def test_remove_isolated_special_chars(self,
+                                            test_input,
+                                            expected):
+        res = TweetFilter._remove_isolated_special_chars(test_input)
+        assert(res == expected)
+
+
+    @pytest.mark.parametrize("test_input,expected",
+                 [
+                   (# input
+                    [(1, "t%%e%st ^^^ test __")], # 2 tabs
+                    # expected
+                    [(1, "t%e%st ^ test _")]
+                   ),
+                   ([],
+                    [])
+                 ])
+    def test_remove_special_duplication(self,
+                                             test_input,
+                                             expected):
+        res = TweetFilter._remove_special_duplication(test_input)
+        assert(res == expected)
+
+
     @pytest.mark.parametrize("test_input,expected",
         [([(1, "Ha ha ha, this is S H I T !"),
            (1, "Please, don't tell such stupid things"),
@@ -217,7 +321,8 @@ class Test_tweets:
     def test_geocode_tweets(self, tweets_obj):
         # self.tweets is created in the process funcion only, we need to
         # initialize it here
-        with open(tweets_obj.raw_tweets_paths[0], "r", encoding="utf8") as f:
+        print(tweets_obj.raw_tweets_paths)
+        with open(tweets_obj.raw_tweets_paths[0][0], "r", encoding="utf8") as f:
             raw_tweets = f.readlines()
             tweets_obj.tweets = [json.loads(x) for x in raw_tweets]
         idx_to_loc = tweets_obj._geocode_tweets([0])
@@ -240,6 +345,7 @@ class Test_tweets:
         assert(len(res[0]) == 4)
 
     def test_filter_gsw_sentences(self, tweets_obj, sentences_info):
+        tweets_obj.tweets = [dict({"id":str(i)}) for i in range(20)]
         res = tweets_obj._filter_gsw_sentences(sentences_info)
         assert(len(res) == 2)
         assert(len(res[0]) == 5)
@@ -258,8 +364,8 @@ class Test_tweets:
         assert(res[0][3] == sentences_info[0][3])
         assert(res[1][3] == sentences_info[4][3])
         # Check the tweets
-        assert(res[0][4] == tweets_obj.tweets[sentences_info[0][0]])
-        assert(res[1][4] == tweets_obj.tweets[sentences_info[4][0]])
+        assert(res[0][4] == dict({"id":"2"}))
+        assert(res[1][4] == dict({"id":"10"}))
 
     def test_write_gsw_tweets(self, tweets_obj):
         dir_path = tweets_obj.config["out_dir_tweet_processing"]
@@ -290,15 +396,17 @@ class Test_tweets:
             os.remove(os.path.join(dir_path, file))
 
     def test_write_new_sg_users(self, tweets_obj):
-        gsw_tweets = [("a,bc",(1.1,2.2), 0.998, "GPS", {"user":{"id_str":2}}),
-                      ("def", (3.3,4.4), 0.93, "GPS", {"user":{"id_str":3}}),
-                      ("gh,i", (5.5,6.6), 0.997, "GPS", {"user":{"id_str":4}})]
+        gsw_tweets = [("a,bc",(1.1,2.2), 0.998, "GPS", {"user":{"id_str":"2"}}),
+                      ("def", (3.3,4.4), 0.93, "GPS", {"user":{"id_str":"3"}}),
+                      ("ghi", (5.5,6.6), 0.997, "GPS", {"user":{"id_str":"4"}})]
         # Make sure we start with an empty file
         df = pd.DataFrame([], columns=["user_id", "gsw_tweet_count"])
         df.set_index("user_id", inplace=True)
         df.to_csv(tweets_obj.config["sg_users_count_path"])
         tweets_obj._write_new_sg_users(gsw_tweets)
         df = pd.read_csv(tweets_obj.config["sg_users_count_path"])
+        # only two users are written because the second line has 0.93 of gsw
+        # prediction, which is not enough to consider the user as Swiss-German
         assert(df.shape == (2,2))
         assert(df.at[0, "user_id"] == 2)
         assert(df.at[1, "user_id"] == 4)
@@ -308,6 +416,7 @@ class Test_tweets:
         df = df.drop(1)
         df.set_index("user_id", inplace=True)
         df.to_csv(tweets_obj.config["sg_users_count_path"])
+        print(df.head())
         # write the same elements again
         tweets_obj._write_new_sg_users(gsw_tweets)
         df = pd.read_csv(tweets_obj.config["sg_users_count_path"])

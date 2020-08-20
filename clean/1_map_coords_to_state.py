@@ -1,14 +1,14 @@
 # Map coordinates to swiss state
 
 import pandas as pd
-from twitter.geocoder import *
+from geocoder import *
 from utils.utils import *
 import os
 
 ###  Settings  #################################################################
-dataset_path = "twitter/final_dataset/gsw_sentences.csv"
-config_path = "twitter/config.yaml"
-coords_to_state_path = "twitter/data/coords_to_state.pkl"
+dataset_path = "dirty_dataset/gsw_sentences.csv"
+config_path = "config.yaml"
+coords_to_state_path = "data/coords_to_state.pkl"
 # Geocoding count interval used to save the mapping object regulary, to avoid
 # having to query locationiq from the very beginning in case of error during the
 # process
@@ -16,7 +16,6 @@ save_interval = 10
 ################################################################################
 
 df = pd.read_csv(dataset_path)
-#print(df.head())
 
 config = load_yaml(config_path)
 geocoder = Geocoder(config)
