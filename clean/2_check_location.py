@@ -70,7 +70,7 @@ ch_states = sorted(["Thurgau","Glarus","Valais/Wallis","Basel-Landschaft",
                     "Appenzell Ausserrhoden","Sankt Gallen", "Geneva"])
 
 print("Extracting locations...")
-locs = [[str(x[1]), x[4]["user"]["location"]] for x in data
+locs = [[str(x[1]), x[5]["user"]["location"]] for x in data
          if x[3] != "GPS" and x[3] != "Twitter_place"]
 print("Sentences with location geocoded : " + str(len(locs)))
 df = pd.DataFrame(locs, columns=["coords", "location"])

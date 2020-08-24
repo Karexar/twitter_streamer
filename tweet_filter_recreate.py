@@ -50,7 +50,7 @@ class TweetFilterRecreate(TweetFilter):
         """Load the tweets and initialize the objects to process them.
         """
 
-        super().__init__()
+        super().__init__(config)
 
         # Create an empty dataset of users and save it (will overwrite the
         # previous one)
@@ -72,34 +72,6 @@ class TweetFilterRecreate(TweetFilter):
                 filtered_tweets.append(tweet)
         return filtered_tweets
 
-    @accepts(Any, GSW_tweets)
-    @returns(None)
-    def _write_gsw_tweets(self, gsw_tweets):
-        """Write the swiss-german tweets on disk as a pickle.
-        """
-        save_obj(gsw_tweets, self.config["path_dirty_gsw_tweets"])
-
-    @accepts(Any, GSW_tweets)
-    @returns(int)
-    def _write_new_sg_users(self, gsw_tweets):
-        """Write the newly found Swiss-German users on disk and update the
-        counts of gsw sentences for each twitter user.
-        """
-        df = pd.read_csv(self.config["sg_users_count_path"],
-                         index_col="user_id")
-        user_ids = set(df.index)
-        new_users_count = 0
-        for gsw_tweet in gsw_tweets:
-            user_id = gsw_tweet[4]
-            prediction = gsw_tweet[2]
-            if current_user_id in df.index:
-                df.at[current_user_id, "gsw_tweet_count"] += 1
-            else:
-                df.loc[current_user_id, "gsw_tweet_count"] = 1
-                new_users_count += 1
-        df.to_csv(self.config["sg_users_count_path"])
-        return new_users_count
-
     @accepts(Any)
     @returns(None)
     def _update_processed_tweets(self):
@@ -107,11 +79,13 @@ class TweetFilterRecreate(TweetFilter):
         with open(self.config["processed_tweets_ids_path"], "w",
                   encoding="utf8") as f:
             new_ids = set(self.new_tweets_ids)
+            print(f"new ids: {len(new_ids)}")
             merged_ids = self.processed_tweets_ids.union(new_ids)
+            print(f"merged ids: {len(merged_ids)}")
             for id in merged_ids:
                 f.write(str(id) + "\n")
 
-    def process(self, path):
+    def process(self, cur_gsw_fetched, path):
         """Process all tweets according to the pipeline :
         1. Extract sub-tweets
         2. Filter out duplicates and tweets that have already been processed
@@ -129,84 +103,83 @@ class TweetFilterRecreate(TweetFilter):
         14. Update the processed tweets ids
         """
 
-        with open(path, "r", encoding="utf8") as f:
-            print("Loading " + path + "...")
-            tweets = load_obj(path)
-            self.tweets = [json.loads(x[4]) for x in tweets]
+        print("Loading " + path + "...")
+        tweets = load_obj(path)
+        self.tweets = [x[4] for x in tweets]
 
-            print(f"Processing {len(self.tweets)} already fetched tweets...")
-            print("Extracting sub-tweets")
-            self.tweets = TweetFilter._extract_sub_tweets(self.tweets)
-            print("  => " + str(len(self.tweets)) + " sub-tweets")
-            print("Filtering out duplicates")
-            self.tweets = self._filter_out_duplicates(self.tweets)
-            print("  => " + str(len(self.tweets)) + " unique tweets ")
-            # Extract the text for each tweet. At this point 'sentences'
-            # represents a list of tuple, each tuple containing the index of
-            # the tweet (i.e. index of self.tweets) and the corresponding
-            # text
-            print("Extracting text from tweets")
-            sentences = TweetFilter._extract_text_from_tweets(self.tweets)
+        print(f"Processing {len(self.tweets)} already fetched tweets...")
+        print("Extracting sub-tweets")
+        self.tweets = TweetFilter._extract_sub_tweets(self.tweets)
+        print("  => " + str(len(self.tweets)) + " sub-tweets")
+        print("Filtering out duplicates")
+        self.tweets = self._filter_out_duplicates(self.tweets)
+        print("  => " + str(len(self.tweets)) + " unique tweets ")
+        # Extract the text for each tweet. At this point 'sentences'
+        # represents a list of tuple, each tuple containing the index of
+        # the tweet (i.e. index of self.tweets) and the corresponding
+        # text
+        print("Extracting text from tweets")
+        sentences = TweetFilter._extract_text_from_tweets(self.tweets)
 
-            print("Preprocessing text")
-            sentences = self._preprocess(sentences)
+        print("Preprocessing text")
+        sentences = self._preprocess(sentences)
 
-            print("Normalizing text")
-            sentences = TweetFilter._normalize_texts(sentences)
+        print("Normalizing text")
+        sentences = TweetFilter._normalize_texts(sentences)
 
-            print("Splitting the text")
-            sentences = self._split_texts(sentences)
-            print(f"=> {len(sentences)} sentences")
+        print("Splitting the text")
+        sentences = self._split_texts(sentences)
+        print(f"=> {len(sentences)} sentences")
 
-            print("Removing sentences that contain at least one very special character")
-            sentences = TweetFilter._remove_sentences_with_special_chars(sentences)
-            print(f"=> {len(sentences)} sentences")
+        print("Removing sentences that contain at least one very special character")
+        sentences = TweetFilter._remove_sentences_with_special_chars(sentences)
+        print(f"=> {len(sentences)} sentences")
 
-            print("Removing words that are composed only of special chars")
-            sentences = TweetFilter._remove_groups_of_special_chars(sentences, self.config["min_char_special_group"])
+        print("Removing words that are composed only of special chars")
+        sentences = TweetFilter._remove_groups_of_special_chars(sentences, self.config["min_char_special_group"])
 
-            print("Removing sentences containing words with too much special characters")
-            sentences = self._remove_sentences_with_special_words(sentences)
-            print(f"=> {len(sentences)} sentences")
+        print("Removing sentences containing words with too much special characters")
+        max_char = self.config["max_special_char_in_word"]
+        sentences = self._remove_sentences_with_special_words(sentences, max_char)
+        print(f"=> {len(sentences)} sentences")
 
-            print("Removing duplication of special characters")
-            sentences = TweetFilter._remove_special_duplication(sentences)
+        print("Removing duplication of special characters")
+        sentences = TweetFilter._remove_special_duplication(sentences)
 
-            print("Removing isolated special chars")
-            sentences = TweetFilter._remove_isolated_special_chars(sentences)
+        print("Removing isolated special chars")
+        sentences = TweetFilter._remove_isolated_special_chars(sentences)
 
-            print("Filtering valid sentences")
-            sentences = self._filter_valid_sentences(sentences)
-            print(f"  => {len(sentences)} well formed sentences")
+        print("Filtering valid sentences")
+        sentences = self._filter_valid_sentences(sentences)
+        print(f"  => {len(sentences)} well formed sentences")
 
-            print("Geocoding...")
-            indices = [x[0] for x in sentences]
-            idx_to_location = self._geocode_tweets(indices)
-            sentences_info = self._attach_gsw_location(
-                                sentences,
-                                idx_to_location,
-                                self.config["keep_foreign_location"])
-            if not self.config["keep_foreign_location"]:
-                print(f"  => {len(sentences_info)} sentences " +
-                      "geolocalized in Switzerland")
+        print("Geocoding...")
+        indices = [x[0] for x in sentences]
+        idx_to_location = self._geocode_tweets(indices)
+        print("Attach geographic information")
+        sentences_info = self._attach_gsw_location(
+                            sentences,
+                            idx_to_location,
+                            self.config["keep_foreign_location"])
+        if not self.config["keep_foreign_location"]:
+            print(f"  => {len(sentences_info)} sentences " +
+                  "geolocalized in Switzerland")
 
-            print("Filtering gsw...")
-            gsw_tweets = self._filter_gsw_sentences(sentences_info)
-            print(f"  => {len(gsw_tweets)} gsw sentences were found")
+        print("Filtering gsw...")
+        gsw_tweets = self._filter_gsw_sentences(sentences_info)
+        print(f"  => {len(gsw_tweets)} gsw sentences were found")
 
-            print("Removing non gsw accents")
-            gsw_tweets = self._remove_non_gsw_accent(gsw_tweets)
+        print("Removing non gsw accents")
+        gsw_tweets = self._remove_non_gsw_accent(gsw_tweets)
 
-            print("Writing gsw tweets on disk...")
-            self._write_gsw_tweets(gsw_tweets)
+        print("Writing gsw tweets on disk...")
+        self._write_gsw_tweets(gsw_tweets)
 
-            print("Writing Swiss-German twitter users...")
-            count = self._write_new_sg_users(gsw_tweets)
-            print(f"  => {count} new Swiss-German users found")
+        print("Writing Swiss-German twitter users...")
+        count = self._write_new_sg_users(gsw_tweets)
+        print(f"  => {count} new Swiss-German users found")
 
-            print("Updating processed tweets ids")
-            self._update_processed_tweets()
+        print("Updating processed tweets ids")
+        self._update_processed_tweets()
 
-            print("Done")
-
-        print("\nAll files have been processed\n")
+        print("Done")

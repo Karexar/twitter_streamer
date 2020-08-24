@@ -15,6 +15,7 @@ import time
 import logging
 import socket
 from urllib3.exceptions import ProtocolError, ReadTimeoutError
+from datetime import datetime, timedelta
 
 class StdOutListener(StreamListener):
     def __init__(self, config):
@@ -75,7 +76,7 @@ class GSW_stream:
             df.to_csv(self.config["sg_users_count_path"])
         # Same for the file containing last tweet for each twitter user
         if not os.path.exists(self.config["sg_users_last_path"]):
-            df = pd.DataFrame([], columns=["user_id", "last_tweet_id"])
+            df = pd.DataFrame([], columns=["user_id", "last_tweet_id", "last_search_time"])
             df.set_index("user_id", inplace=True)
             df.to_csv(self.config["sg_users_last_path"])
 
@@ -254,7 +255,10 @@ class GSW_stream:
         user_ids_last = set(df_last.index)
         for idx in user_ids_count:
             if not idx in user_ids_last:
-                df_last.loc[idx] = ["1"]
+                df_last.loc[idx] = ["1", datetime(2020, 1, 1, 0, 0, 0)]
+        df_last_str = df_last.copy()
+        df_last_str.last_search_time.map(lambda x:
+                            x.strftime("%Y-%m-%d %H:%M:%S"))
         df_last.to_csv(self.config["sg_users_last_path"])
 
     @accepts(Any, str, str, List[str], Dict[str, str], pd.core.frame.DataFrame)
@@ -311,8 +315,13 @@ class GSW_stream:
                 if user_id not in df_last.index:
                     raise KeyError(f"user_id '{user_id}' not in df_last.index")
                 df_last.at[user_id, "last_tweet_id"] = last
+                df_last.at[user_id, "last_search_time"] = datetime.now()
 
-            df_last.to_csv(self.config["sg_users_last_path"])
+            # Convert last_search_time to str before saving to disk
+            df_last_str = df_last.copy()
+            df_last_str.last_search_time.map(lambda x:
+                                x.strftime("%Y-%m-%d %H:%M:%S"))
+            df_last_str.to_csv(self.config["sg_users_last_path"])
             update_last_tweet.clear()
 
     @accepts(Any)
@@ -339,6 +348,8 @@ class GSW_stream:
         df_count.index = df_count.index.astype(str)
         df_last = pd.read_csv(self.config["sg_users_last_path"],
                               index_col="user_id", dtype=str)
+        df_last.last_search_time = df_last.last_search_time.map(lambda x:
+                            datetime.strptime(x, "%Y-%m-%d %H:%M:%S"))
         df_last.index = df_last.index.astype(str)
         # In principle there should be no duplicates
         #df_last = df_last.loc[~df_last.index.duplicated(keep='first')]
@@ -373,27 +384,30 @@ class GSW_stream:
         update_last_tweet = dict()
 
         for user_id, row in df_all.iterrows():
-            try:
-                self.search_user(str(user_id),
-                                 str(row["last_tweet_id"]),
-                                 tweets,
-                                 update_last_tweet,
-                                 df_last)
-            except tweepy.error.TweepError as e:
-                print(str(e))
-                if "status code = 401" in str(e) or "status code = 404":
-                    print("Cannot get user timeline (401/404), skipping...")
-                    logging.exception("")
-                else:
+            min_days_to_fetch = self.config["min_days_to_fetch"]
+            threshold = datetime.now() - timedelta(days=min_days_to_fetch)
+            if row["last_search_time"] < threshold:
+                try:
+                    self.search_user(str(user_id),
+                                     str(row["last_tweet_id"]),
+                                     tweets,
+                                     update_last_tweet,
+                                     df_last)
+                except tweepy.error.TweepError as e:
+                    print(str(e))
+                    if "status code = 401" in str(e) or "status code = 404":
+                        print("Cannot get user timeline (401/404), skipping...")
+                        logging.exception("")
+                    else:
+                        traceback.print_exc()
+                        logging.exception("")
+                        time.sleep(120)
+                        self.authentify_twitter()
+                except Exception:
                     traceback.print_exc()
                     logging.exception("")
                     time.sleep(120)
                     self.authentify_twitter()
-            except Exception:
-                traceback.print_exc()
-                logging.exception("")
-                time.sleep(120)
-                self.authentify_twitter()
 
 
         if len(tweets) > 0:

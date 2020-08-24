@@ -29,7 +29,7 @@ Sentences_info = List[Tuple[int, str, Tuple[float, float], str]]
 Idx_to_location = Dict[int, Tuple[Any, Coords, str]]
 # GSW_tweets : elements are
 # (sentence, (lon, lat), gsw prediction, geo_source, original tweet)
-GSW_tweets = List[Tuple[str, Tuple[float, float], float, str, dict]]
+GSW_tweets = List[Tuple[str, Tuple[float, float], float, str, str, dict]]
 
 class TweetFilter:
     """This class handles all the pipeline of tweet processing, that is loading,
@@ -436,7 +436,7 @@ class TweetFilter:
         idx_to_location = dict()
         # Get the indices of all tweets we want to geocode.
         indices = set(indices)
-        for idx in indices:
+        for idx in tqdm(indices):
             tweet = self.tweets[idx]
             if tweet.get("coordinates", None):
                 location = tuple(tweet["coordinates"]["coordinates"])
@@ -519,17 +519,16 @@ class TweetFilter:
                           code...) found in the user.location field
                         * "" : No location available"""
         sentences_info = []
-        for idx in tqdm(idx_to_location):
-            coords = idx_to_location[idx][1]
+        for sentence in tqdm(sentences):
+            tweet_id = sentence[0]
+            coords = idx_to_location[tweet_id][1]
+            geo_source = idx_to_location[tweet_id][2]
             if keep_foreign \
             or self.geocoder.are_coords_in_switzerland(coords):
-                for sentence in sentences:
-                    if sentence[0] == idx:
-                        geo_source = idx_to_location[idx][2]
-                        sentences_info.append((idx,
-                                               sentence[1],
-                                               coords,
-                                               geo_source))
+                sentences_info.append((tweet_id,
+                                       sentence[1],
+                                       coords,
+                                       geo_source))
 
         return sentences_info
 
@@ -561,13 +560,13 @@ class TweetFilter:
                 sentence = sentences_info[i][1]
                 coords = sentences_info[i][2]
                 geo_source = sentences_info[i][3]
-                #user_id = tweet["user"]["id_str"]
                 tweet = self.tweets[sentences_info[i][0]]
+                user_id = str(tweet["user"]["id_str"])
                 gsw_tweets.append((sentence,
                                    coords,
                                    prediction,
                                    geo_source,
-                                   #user_id,
+                                   user_id,
                                    tweet))
         del(predictions)
         gc.collect()
@@ -577,7 +576,7 @@ class TweetFilter:
     @accepts(Any, GSW_tweets)
     @returns(GSW_tweets)
     def _remove_non_gsw_accent(self, gsw_tweets):
-        return [(Cleaner.remove_non_gsw_accent(x[0]), x[1], x[2], x[3], x[4])
+        return [(Cleaner.remove_non_gsw_accent(x[0]), x[1],x[2],x[3],x[4],x[5])
                 for x in tqdm(gsw_tweets)]
 
     @accepts(Any, GSW_tweets)
@@ -607,19 +606,15 @@ class TweetFilter:
         df = pd.read_csv(self.config["sg_users_count_path"],
                          index_col="user_id")
         df.index = df.index.map(str)
-        user_ids = set(df.index)
         new_users_count = 0
         for gsw_tweet in tqdm(gsw_tweets):
-             original_tweet = gsw_tweet[4]
              prediction = gsw_tweet[2]
-             if "user" in original_tweet \
-             and prediction >= self.config["threshold_new_sg_user"]:
-                 current_user_id = str(original_tweet["user"]["id_str"])
-                 if current_user_id in user_ids:
+             current_user_id = gsw_tweet[4]
+             if prediction >= self.config["threshold_new_sg_user"]:
+                 if current_user_id in df.index:
                      df.at[current_user_id, "gsw_tweet_count"] += 1
                  else:
-                     df.loc[current_user_id] = [1]
-                     user_ids.add(current_user_id)
+                     df.loc[current_user_id, "gsw_tweet_count"] = 1
                      new_users_count += 1
         df.to_csv(self.config["sg_users_count_path"])
         return new_users_count

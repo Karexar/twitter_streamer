@@ -6,9 +6,10 @@ from tqdm import tqdm
 import time
 import datetime
 from pathlib import Path
+import os
 
 ###  Settings  ################################################################
-dataset_dir = "final_dataset"
+dataset_dir = "dirty_dataset"
 ###############################################################################
 
 def main():
@@ -19,12 +20,26 @@ def main():
 
     print(datetime.datetime.now())
     print("Loading current dataset...")
-    current_final_tweets = load_obj(config["path_dirty_gsw_tweets"])
-    cur_sentences = pd.read_csv(config["path_dirty_gsw_sentences"])
+
+    current_final_tweets = []
+    if os.path.exists(config["path_dirty_gsw_tweets"]):
+        current_final_tweets = load_obj(config["path_dirty_gsw_tweets"])
+
+    cur_sentences = pd.DataFrame(columns=['sentence',
+                                          'coords',
+                                          'gsw_prediction',
+                                          'geo_source',
+                                          'user_id',
+                                          'tweet_id'])
+    if os.path.exists(config["path_dirty_gsw_sentences"]):
+        cur_sentences = pd.read_csv(config["path_dirty_gsw_sentences"])
+
     count90 = cur_sentences[cur_sentences["gsw_prediction"] >= 0.9].shape[0]
     count95 = cur_sentences[cur_sentences["gsw_prediction"] >= 0.95].shape[0]
+    count99 = cur_sentences[cur_sentences["gsw_prediction"] >= 0.99].shape[0]
     print(f"{count90} gsw sentences with prediction 0.9")
     print(f"{count95} gsw sentences with prediction 0.95")
+    print(f"{count99} gsw sentences with prediction 0.99")
     assert(len(current_final_tweets) == len(cur_sentences))
     print("Adding new sentences...")
     ids_done = set(cur_sentences.tweet_id.apply(str).values)
@@ -43,13 +58,13 @@ def main():
         # adding has been already processed.
         filtered_tweets = []
         for t in gsw_tweets:
-            if not str(t[4]["id_str"]) in ids_done:
+            if not str(t[5]["id_str"]) in ids_done:
                 filtered_tweets.append(t)
             else:
                 skip_count += 1
 
         full_object += filtered_tweets
-        gsw_tweets = [[x[0],x[1],x[2],x[3],x[4]["id_str"]]
+        gsw_tweets = [[x[0],x[1],x[2],x[3],x[4],x[5]["id_str"]]
                       for x in filtered_tweets]
         res += gsw_tweets
     print(f"{skip_count} sentences already processed")
@@ -58,6 +73,7 @@ def main():
                                     "coords",
                                     "gsw_prediction",
                                     "geo_source",
+                                    "user_id",
                                     "tweet_id"])
     # concatenate with the already existing dataset
     df = pd.concat([cur_sentences, df])

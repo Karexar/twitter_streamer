@@ -1,8 +1,9 @@
-# This script cleans the twitter dataset
-# WARNING : The check_location script must have been performed before, in order
+# This script cleans the twitter dataset by removing the wrong location
+# spotted by the check_location script.
+# WARNING : The check_location script MUST have been performed before, in order
 # to have the useful and useless locations stored.
 
-# This file loads the twitter dataset and performs the following operations :
+# The following operations are executed :
 #  1. Load the coords_to_state mapping object and create a column with the
 #     cantons (states) from the coords column.
 #  2. Map the coords to dialect for the GPS dataset (i.e. the data points where
@@ -23,7 +24,7 @@ import pandas as pd
 #import _thread
 from utils.utils import *
 from pathlib import Path
-from twitter.geocoder import *
+from geocoder import *
 import os
 
 
@@ -33,12 +34,13 @@ dataset_path = "dirty_dataset/gsw_tweets.pkl"
 useless_locs_path = "data/useless_locs.pkl"
 useful_locs_path = "data/useful_locs.pkl"
 label_corrections_path = "data/label_corrections.pkl"
-output_dir = "final_dataset"
+output_path = "final_dataset/gsw_sentences.csv"
+coords_to_state_path = "data/coords_to_state.pkl"
 # the dominant threshold is the minimum proportion a dialect should have for a
 # given user to consider that the user is representative of the dialect.
 # This is relevant only when the location is the tweet location (geo_source =
 # GPS or Twitter_place) because each tweet may have a different location.
-dominant_threshold = 0.67
+dominant_threshold = 0.75
 ################################################################################
 
 def dominant_dialect(dialects):
@@ -54,29 +56,23 @@ def dominant_dialect(dialects):
 
 #_thread.start_new_thread( keep_alive, tuple() )
 
-Path(gsw_labelled_dir).mkdir(parents=True, exist_ok=True)
-Path(gsw_unlabelled_dir).mkdir(parents=True, exist_ok=True)
-Path(gsw_fake_unlabelled_dir).mkdir(parents=True, exist_ok=True)
-
 print("Loading the dataset...")
+# index : [sentence, coords, gsw_prediction, geo_source, user_id, tweet]
 data = load_obj(dataset_path)
-
-
-# 0: sentence, 1: (lon,lat), 2: gsw prediction, 3: geo_source, 4: original tweet
-lines = [[x[0], str(x[1]), x[2], x[3], x[4]["user"]["location"],
-         x[4]["user"]["id_str"]] for x in data]
+lines = [[x[0], str(x[1]), x[2], x[3], x[4], x[5]["id_str"],
+         x[5]["user"]["location"]] for x in data]
 df = pd.DataFrame(lines, columns=["sentence",
                                   "coords",
                                   "prediction",
                                   "geo_source",
-                                  "location",
-                                  "user_id"])
+                                  "user_id",
+                                  "tweet_id",
+                                  "location"])
 df["location"] = df["location"].map(lambda x: "" if x is None else str(x))
 df["location"] = df["location"].map(heavy_normalize_text)
 
 
 # Load the mapping from coords to canton (state)
-coords_to_state_path = "twitter/data/coords_to_state.pkl"
 coords_to_state = load_obj(coords_to_state_path)
 if not set(df.coords.values).issubset(coords_to_state.keys()):
     raise Exception("coords_to_state must contain all coords in the dataset")
@@ -173,9 +169,11 @@ df_iq = df_iq.drop(["useful"], axis=1)
 # Merge the dataset
 df = pd.concat([df_gps, df_iq])
 
-df[df["dialect"].isna()]["dialect"] = "Unknown"
+df.fillna({"dialect":"Unknown"}, inplace=True)
+#df[df["dialect"].isna()]["dialect"] = "Unknown"
+df = df.drop(["canton"], axis=1)
 
 if df.shape[0] != len(lines):
     raise Exception("The output is not the same size as the input")
 
-df.to_csv("")
+df.to_csv(output_path, index=False)

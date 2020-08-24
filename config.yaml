@@ -161,7 +161,9 @@ raw_tweets_search_batch_size: 4000
 # gsw tweet count threshold (i.e. how much gsw tweet a user needs to have
 # tweeted) to fetch all tweets from a given user
 gsw_tweet_count_threshold: 1
-
+# minimum interval in days between now the last time we fetch a user to fetch
+# the user again.
+min_days_to_fetch: 7
 # filter_languages will be used as a parameter of the filter function from the
 # twitter api (for streaming tweet). It is a list of languages on which to
 # filter.

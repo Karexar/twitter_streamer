@@ -345,11 +345,12 @@ class Test_tweets:
         assert(len(res[0]) == 4)
 
     def test_filter_gsw_sentences(self, tweets_obj, sentences_info):
-        tweets_obj.tweets = [dict({"id":str(i)}) for i in range(20)]
+        tweets_obj.tweets = [dict({"user":dict({"id_str":str(i)})})
+                             for i in range(20)]
         res = tweets_obj._filter_gsw_sentences(sentences_info)
         assert(len(res) == 2)
-        assert(len(res[0]) == 5)
-        assert(len(res[1]) == 5)
+        assert(len(res[0]) == 6)
+        assert(len(res[1]) == 6)
         # Check the sentences
         assert(res[0][0] == sentences_info[0][1])
         assert(res[1][0] == sentences_info[4][1])
@@ -363,15 +364,18 @@ class Test_tweets:
         # Check the geo_source
         assert(res[0][3] == sentences_info[0][3])
         assert(res[1][3] == sentences_info[4][3])
+        # Check the user_id
+        assert(res[0][4] == "2")
+        assert(res[1][4] == "10")
         # Check the tweets
-        assert(res[0][4] == dict({"id":"2"}))
-        assert(res[1][4] == dict({"id":"10"}))
+        assert(res[0][5]["user"]["id_str"] == "2")
+        assert(res[1][5]["user"]["id_str"] == "10")
 
     def test_write_gsw_tweets(self, tweets_obj):
         dir_path = tweets_obj.config["out_dir_tweet_processing"]
-        gsw_tweets = [("a,bc",(1.1,2.2), 0.97, "GPS", dict()),
-                      ("def", (3.3,4.4), 0.93, "GPS", dict()),
-                      ("gh,i", (5.5,6.6), 0.997, "GPS", dict())]
+        gsw_tweets = [("a,bc",(1.1,2.2), 0.97, "GPS", "1", dict()),
+                      ("def", (3.3,4.4), 0.93, "GPS", "2", dict()),
+                      ("gh,i", (5.5,6.6), 0.997, "GPS", "3", dict())]
         files = os.listdir(dir_path)
         for file in files:
             os.remove(os.path.join(dir_path, file))
@@ -396,9 +400,12 @@ class Test_tweets:
             os.remove(os.path.join(dir_path, file))
 
     def test_write_new_sg_users(self, tweets_obj):
-        gsw_tweets = [("a,bc",(1.1,2.2), 0.998, "GPS", {"user":{"id_str":"2"}}),
-                      ("def", (3.3,4.4), 0.93, "GPS", {"user":{"id_str":"3"}}),
-                      ("ghi", (5.5,6.6), 0.997, "GPS", {"user":{"id_str":"4"}})]
+        gsw_tweets = [("a,bc",(1.1,2.2), 0.998, "GPS", "2",
+                        {"user":{"id_str":"2"}}),
+                      ("def", (3.3,4.4), 0.93, "GPS", "3",
+                        {"user":{"id_str":"3"}}),
+                      ("ghi", (5.5,6.6), 0.997, "GPS", "4",
+                        {"user":{"id_str":"4"}})]
         # Make sure we start with an empty file
         df = pd.DataFrame([], columns=["user_id", "gsw_tweet_count"])
         df.set_index("user_id", inplace=True)
