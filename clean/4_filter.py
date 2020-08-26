@@ -1,6 +1,6 @@
 # This script filter the final dataset to remove sentences that are likely not
 # to be Swiss-German, either by using the prediction score, or by removing
-# users with low GSW tweet count.
+# users with low GSW tweet count. It also removes duplicates
 
 import pandas as pd
 
@@ -19,6 +19,9 @@ df = pd.read_csv(dataset_path)
 print("Filtering...")
 # filter low gsw prediction
 df = df[df.prediction >= gsw_threshold]
+
+# remove duplicates
+df = df.drop_duplicates(subset=['user_id', 'sentence'], keep='first')
 
 # For each user, compute the count of sentences of gsw prediction over a
 # threshold.
@@ -44,8 +47,6 @@ print(f"Unlabelled after : {df_unlab.shape[0]}")
 
 df = pd.concat([df_lab, df_unlab])
 df = df.drop(columns=["user_gsw_count", "location"])
-
-print(f"Total length : {df.shape[0]}")
 
 # Save on disk
 df.to_csv(output_path, sep="\t", index=False)

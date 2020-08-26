@@ -4,21 +4,20 @@
 # to have the useful and useless locations stored.
 
 # The following operations are executed :
-#  1. Load the coords_to_state mapping object and create a column with the
-#     cantons (states) from the coords column.
-#  2. Map the coords to dialect for the GPS dataset (i.e. the data points where
-#     coordinates are given by twitter).We take the dominant dialect for each
-#     user.
-#  3. Map the coord to canton for the IQ dataset (i.e. the data points where
-#     coordinates are given by locationIQ).
-#  4. Load the useful and useless locations, ensure all locations in the dataset
-#     are included in one of the two files, and label (i.e. overwrite) as
-#     "Unknown" all locations that are useless (only for the iq dataset)
-#  5. Map each canton to the dialect (group of cantons) for the IQ dataset
-#  6. Keep a 'sentence', 'label', and 'user_id' column and merge the two
-#     datasets
-#  7. Split the dataset into labelled and unlabelled, save them on disk and
-#     output aggregated data
+#  1.  Load the dataset and coords_to_state object and split the dataset into
+#      a GPS dataset (i.e. sentences where coordinates are given by twitter
+#      directly in the tweet object ) IQ dataset (i.e. sentences where
+#      coordinates are given by locationIQ using the user.location field).
+#  2.  Map the coords to dialect for the GPS dataset.
+#  3a. Map the coord to canton for the IQ dataset
+#  3b. Load the useful and useless locations, ensure all locations in the
+#      dataset are included in one of the two files, and label (i.e. overwrite)
+#      as "Unknown" all locations that are useless (only for the iq dataset)
+#  3c. Correct the label using the renaming from check_location script
+#  3d. Map each canton to the dialect (group of cantons) for the IQ dataset
+#  4.  merge the two datasets
+#  5.  Since the gps and iq dataset may have different label for a given user
+#      we take the dominant dialect for each user
 
 import pandas as pd
 #import _thread
@@ -40,21 +39,36 @@ coords_to_state_path = "data/coords_to_state.pkl"
 # given user to consider that the user is representative of the dialect.
 # This is relevant only when the location is the tweet location (geo_source =
 # GPS or Twitter_place) because each tweet may have a different location.
-dominant_threshold = 0.75
+dominant_threshold = 0.75 # percentage among all dialect
+dominant_overall = 0.2 # percentage among all dialect + Unknown
 ################################################################################
+
+#_thread.start_new_thread( keep_alive, tuple() )
 
 def dominant_dialect(dialects):
     """Return the dominant dialect or None if the proportion is not enough"""
-    length = len(dialects)
     distribution = dialects.value_counts()
+    # First check if the dominant dialect (not Unknown) is present in at least
+    # 'dominant_overall' sentences
     if len(distribution) > 0:
-        dominant_percentage = distribution[0] / length
+        dominant = [distribution.index[0], distribution[0]]
+        if dominant[0] == "Unknown":
+            if len(distribution) > 1:
+                dominant = [distribution.index[1], distribution[1]]
+            else:
+                return "Unknown"
+        if dominant[1] / distribution.sum() < dominant_overall:
+            return "Unknown"
+    if "Unknown" in distribution:
+        distribution = distribution.drop("Unknown")
+    if len(distribution) > 0:
+        dominant_percentage = distribution[0] / distribution.sum()
         if dominant_percentage >= dominant_threshold:
             return distribution.index[0]
-    return None
+    return "Unknown"
 
 
-#_thread.start_new_thread( keep_alive, tuple() )
+#---  1. Load the dataset and split into GPS and IQ dataset --------------------
 
 print("Loading the dataset...")
 # index : [sentence, coords, gsw_prediction, geo_source, user_id, tweet]
@@ -92,8 +106,8 @@ if df.shape[0] != df_gps.shape[0] + df_iq.shape[0]:
     raise Exception(f"Wrong shapes ({df_gps.shape[0]}+{df_iq.shape[0]} != "
                     + f"{df.shape[0]})")
 
-### 'GPS' dataset, where coordinates are given by twitter ######################
-# for the first dataset, map the coords to the corresponding canton
+#---  2. Map the coords to dialect for the GPS dataset -------------------------
+
 print("-----------------------------------------------------------------------")
 print("Processing the dataset with coordinates from twitter...")
 print(f"Length : {df_gps.shape[0]}")
@@ -107,11 +121,6 @@ print("*****  Make sure the following are not swiss-german canton *****")
 # state_to_code dictionary
 print(set(df_gps[df_gps["dialect"].isna()]["canton"]))
 
-# Set the dominant dialect used for each user
-user_dialect = df_gps.groupby("user_id")["dialect"].apply(dominant_dialect)
-df_gps = df_gps.drop(["dialect"], axis=1)
-# Merge the dominant dialect with the gps dataset
-df_gps = df_gps.merge(user_dialect, on="user_id")
 print("df_gps done. Summary : ")
 value_count = df_gps["dialect"].value_counts()
 print(value_count)
@@ -123,13 +132,14 @@ if sum_labelled + sum_unlabelled != df_gps.shape[0]:
     raise Exception(f"Wrong shapes : {sum_labelled} + {sum_unlabelled} != " +
                     f"{df_gps.shape[0]}")
 
-### 'IQ' dataset, where coordinates are given by locationIQ ####################
-# map the coords to the corresponding canton
+#---  3. Map the coord to canton for the IQ dataset  ---------------------------
+
 print("-----------------------------------------------------------------------")
 print("Processing the dataset with coordinates from locationIQ...")
 print(f"Length : {df_iq.shape[0]}")
 df_iq["canton"] = df_iq["coords"].map(lambda x: coords_to_state[x])
-# Overwrite the 'canton' with 'unknown' where location is useless
+
+# 3b. Mark as unknown useless location 
 useless_locs = load_obj(useless_locs_path)
 useful_locs = load_obj(useful_locs_path)
 usefulness_set = useless_locs.union(useful_locs)
@@ -139,13 +149,12 @@ print("Useful count : " + str(df_iq[df_iq["useful"]==1].shape[0]))
 print("Useless count : " + str(df_iq[df_iq["useful"]==0].shape[0]))
 df_iq.loc[df_iq["useful"]==0, "canton"] = "Unknown"
 
-# Load the file containing the label corrections
+# 3c. Load the file containing the label corrections and correct the label
 corr = load_obj(label_corrections_path)
-# Correct the label for the given locations
 for key in corr:
     df_iq.loc[df_iq["location"]==key, "canton"] = corr[key]
 
-# Map the canton to the dialect
+# 3d. Map the canton to the dialect
 df_iq["dialect"] = df_iq["canton"].map(Geocoder.state_to_dialect)
 print("Make sure the following are not swiss-german canton : ")
 # If some swiss-german canton are printed, then we need to add them to the
@@ -166,14 +175,31 @@ if sum_labelled + sum_unlabelled != df_iq.shape[0]:
 
 df_iq = df_iq.drop(["useful"], axis=1)
 
-# Merge the dataset
+#--- 4. Merge the dataset  -----------------------------------------------------
+
+print("-----------------------------------------------------------------------")
+print("Merge datasets")
 df = pd.concat([df_gps, df_iq])
 
 df.fillna({"dialect":"Unknown"}, inplace=True)
 #df[df["dialect"].isna()]["dialect"] = "Unknown"
 df = df.drop(["canton"], axis=1)
 
+#--- 5. Take the dominant dialect for each user --------------------------------
+
+# Set the dominant dialect used for each user
+user_dialect = df.groupby("user_id")["dialect"].apply(dominant_dialect)
+df = df.drop(["dialect"], axis=1)
+df = df.merge(user_dialect, on="user_id")
+df.fillna({"dialect":"Unknown"}, inplace=True)
+
 if df.shape[0] != len(lines):
     raise Exception("The output is not the same size as the input")
+
+unlabelled = df["dialect"].value_counts()["Unknown"]
+labelled = df["dialect"].value_counts().sum() - unlabelled
+print(f"Labelled : {labelled}")
+print(f"Unlabelled : {unlabelled}")
+print(df["dialect"].value_counts())
 
 df.to_csv(output_path, index=False)
