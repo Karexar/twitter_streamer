@@ -8,19 +8,23 @@
 # common words.
 
 from utils.utils import *
-from twitter.corpus_stat import *
+from corpus_class.corpus_stat import *
 import pandas as pd
 import os
 import _thread
 
 ###  Settings  ################################################################
-gsw_path = "data/swisstext_leipzig/swisstext_leipzig.txt"
+gsw_path = "data/leipzig_32/gsw_swisstext_leipzig.txt"
 deu_path = "data/leipzig_32/deu-de_web-public_2019_1M_converted.txt"
-path_speakers = "twitter/speakers.csv"
+path_speakers = "data/speakers.csv"
 corpus_32_dir = "data/leipzig_32"
-gsw_like = ["bar", "frr", "ksh", "lim", "nds", "pfl"]
+#gsw_like = ["bar", "frr", "ksh", "lim", "nds", "pfl", ]
+gsw_like = ["afr", "bar", "cat", "dan", "eng", "epo", "est", "fin", "fra", "frr",
+         "gle", "glg", "hrv", "isl", "ita", "jav", "knn", "ksh", "lim", "ltz",
+         "nds", "nld", "pap", "pfl", "por", "ron", "slv", "spa", "swa", "swe"]
 #specificities = [round(x*0.05, 2) for x in range(19)]
-specificities = [round(x*0.02, 2) for x in range(16)]
+#specificities = [round(x*0.005, 2) for x in range(201)]
+specificities = [0.25]
 weighted = True
 ###############################################################################
 
@@ -62,7 +66,9 @@ df["sum_ratio"] = df[languages].sum(axis=1)
 df["gsw_ratio"] = df["gsw"] / df["sum_ratio"]
 
 # Apply specificity on the ratio to filter out words that are not specific
-# enough. Note that we should not simply sort by ratio descending and return
+# enough. Then we take the 400 most common words, which corresponds to the
+# filtered words with the highest proportion in Swiss-German.
+# Note that we should not simply sort by ratio descending and return
 # the list because a high ratio does not always mean the word is frequent in
 # Swiss-German. Think about a very rare word that appears only in Swiss-German.
 # It would have a ratio of 1, which is the highest.
@@ -89,5 +95,5 @@ for specificity in specificities:
     for x in common_words[:10]:
         print(x)
 
-print([round(x*100, 2) for x in gsw_cov_list])
-print([round(x*100, 2) for x in german_cov_list])
+print([round(x*100, 3) for x in gsw_cov_list])
+print([round(x*100, 3) for x in german_cov_list])

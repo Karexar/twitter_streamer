@@ -183,7 +183,7 @@ df = pd.concat([df_gps, df_iq])
 
 df.fillna({"dialect":"Unknown"}, inplace=True)
 #df[df["dialect"].isna()]["dialect"] = "Unknown"
-df = df.drop(["canton"], axis=1)
+#df = df.drop(["canton"], axis=1)
 
 #--- 5. Take the dominant dialect for each user --------------------------------
 
@@ -200,6 +200,11 @@ unlabelled = df["dialect"].value_counts()["Unknown"]
 labelled = df["dialect"].value_counts().sum() - unlabelled
 print(f"Labelled : {labelled}")
 print(f"Unlabelled : {unlabelled}")
+print("Origin of users")
+origin_users = df.groupby("user_id")["canton"].apply(
+                                lambda x: x.value_counts(dropna=False).index[0])
+print(origin_users.value_counts())
+print("Dialect repartition")
 print(df["dialect"].value_counts())
 
 df.to_csv(output_path, index=False)

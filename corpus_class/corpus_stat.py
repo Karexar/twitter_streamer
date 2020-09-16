@@ -1,11 +1,12 @@
 import pandas as pd
-from typing import List
 from preprocessing.cleaner import *
 from tqdm import tqdm
 
 class Corpus_stat:
     """Tool to compute statistics on a text corpus
     """
+
+    punc_marks = set(".,:;!?")
 
     def __init__(self, path: str, sep=","):
         """Load the corpus and initialize attributes.
@@ -19,12 +20,24 @@ class Corpus_stat:
         self.vocab = None
         self.sentences_set = None
 
+    def _isolate_words(sentence):
+        words = sentence.split()
+        res = []
+        for word in words:
+            if len(word) > 3 and word[-3:] == "...":
+                res.append(word[:-3])
+            elif len(word) > 0 and word[-1] in Corpus_stat.punc_marks:
+                res.append(word[:-1])
+            elif len(word) > 0:
+                res.append(word)
+        return ' '.join(res)
+
     def _sentence_to_word_set(self):
         """Convert the list of sentences into a list of set containing the
         words for each sentences"""
         self.sentences_set = []
         for sentence in self.df.iloc[:, 0].values:
-            sentence = Cleaner._isolate_words(sentence)
+            sentence = Corpus_stat._isolate_words(sentence)
             words_in_sentence = set(sentence.split())
             self.sentences_set.append(words_in_sentence)
 
@@ -32,7 +45,7 @@ class Corpus_stat:
         """Concatenate the sentences of the corpus and clean the punctuation and
         digits"""
         full_str = ' '.join(list(self.df.iloc[:, 0].values))
-        return Cleaner._isolate_words(full_str)
+        return Corpus_stat._isolate_words(full_str)
 
     def _compute_word_distribution(self):
         """Split the corpus into words and compute the count of each

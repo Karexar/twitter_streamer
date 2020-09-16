@@ -333,7 +333,7 @@ class TweetFilter:
     def _remove_sentences_with_special_words(sentences: Sentences,
                                              max_char: int) -> Sentences:
         """Remove sentences with words containing too much special characters.
-        Must be called before _remove_special_chars"""
+        """
 
         chars_ok = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
         chars_ok += "ÀÁÂÄÈÉÊËÍÌÎÏÓÒÔÖÚÙÛÜàáâäèéêëìíîïôöòóüùúûÿ"

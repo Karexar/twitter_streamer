@@ -194,7 +194,7 @@ track_word_language: "gsw"
 # If the specificity is too high, then coverage is low
 # If the specifitiy is too low, then a lot of non swiss-german tweets are
 # listened.
-track_word_specificity: 0.3
+track_word_specificity: 0.2
 # Add a ponderation to the TF-IDF score corresponding to the number of speakers
 # for each language. Motivation : suppose a word very representative of both
 # Swiss-German and a language with 100k speakers. It may have a low TF-IDF score

@@ -3,21 +3,26 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import os
 from utils.utils import *
 from preprocessing.cleaner import *
+from corpus_class.corpus_stat import *
 
 
 class Corpus_32:
-    """A class containing corpus for 32 different languages"""
+    """A class containing corpus for 32 different languages with the same
+    alphabet as GSW. This class uses TF-IDF to compute words specific to
+    Swiss-German"""
 
-    def __init__(self, dir_path, path_speakers):
+    def __init__(self, dir_path, path_speakers, langs=None):
         self.ponderation = dict()
         self.corpus = dict()
+        if langs is None:
+            langs = [x[:3] for x in os.listdir(dir_path) if x.endswith("txt")]
         for doc in os.listdir(dir_path):
-            if doc.endswith(".txt"):
+            if doc.endswith(".txt") and doc[:3] in langs:
                 with open(os.path.join(dir_path, doc), "r",
                           encoding="utf8") as f:
                     print("Reading " + doc)
                     lines = f.readlines()
-                    full_str = Cleaner._isolate_words(' '.join(lines))
+                    full_str = Corpus_stat._isolate_words(' '.join(lines))
                     self.corpus[doc[:3]] = full_str
 
         print("Vectorization...")

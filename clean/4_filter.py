@@ -11,6 +11,7 @@ gsw_threshold = 0.95
 gsw_high_threshold = 0.995
 gsw_count_threshold_labelled = 3
 gsw_count_threshold_unlabelled = 10
+min_word_per_sentence = 5
 ################################################################################
 
 print("Loading dataset")
@@ -19,9 +20,14 @@ df = pd.read_csv(dataset_path)
 print("Filtering...")
 # filter low gsw prediction
 df = df[df.prediction >= gsw_threshold]
+#df = df.drop(["canton"], axis=1)
 
 # remove duplicates
 df = df.drop_duplicates(subset=['user_id', 'sentence'], keep='first')
+
+# remove short sentences
+lengths = df.sentence.apply(lambda x: len(x.split()))
+df = df[lengths >= min_word_per_sentence]
 
 # For each user, compute the count of sentences of gsw prediction over a
 # threshold.
