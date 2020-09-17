@@ -3,8 +3,7 @@ from tweepy import OAuthHandler, Stream, API, Cursor
 import tweepy
 from utils.utils import *
 from corpus_class.corpus_stat import *
-from corpus_class.corpus_32 import *
-from corpus_class.corpus_8 import *
+from corpus_class.corpus_manager import *
 import json
 import os
 import traceback
@@ -16,6 +15,7 @@ import logging
 import socket
 from urllib3.exceptions import ProtocolError, ReadTimeoutError
 from datetime import datetime, timedelta
+import pathlib
 
 class StdOutListener(StreamListener):
     def __init__(self, config):
@@ -81,79 +81,51 @@ class GSW_stream:
             df.to_csv(self.config["sg_users_last_path"])
 
         print("Preparing the track words...")
-        track_word_dir_path = self.config["track_word_dir_path"]
-        if self.config["track_word_type"] == "common":
-            # First check if we already have the data
-            track_word_count = self.config["track_word_count"]
-            track_word_file_name = "common_" + str(track_word_count) + ".pkl"
-            path = os.path.join(track_word_dir_path, track_word_file_name)
-            if track_word_file_name in os.listdir(track_word_dir_path):
-                print("Track word data found, loading the file...")
-                self.track_words = load_obj(path)
-            else:
-                print("Track word data not found, creating the data...")
+        corpus_dir = self.config["corpus_dir_path"]
+        track_word_dir = os.path.join(corpus_dir, "track_words")
+        pathlib.Path(track_word_dir).mkdir(parents=True, exist_ok=True)
+
+        track_word_count = self.config["track_word_count"]
+        language = self.config["track_word_language"]
+        specificity = self.config["track_word_specificity"]
+        ponderation = self.config["track_word_ponderated"]
+        track_word_method = self.config["track_word_method"]
+        if track_word_method not in {"common", "tfidf", "proportion"}:
+            raise ValueError("Wrong value for track_word_method")
+        track_word_file_name = str(track_word_method) + "_" \
+                                + str(track_word_count)
+        if track_word_method != "common":
+            track_word_file_name += "_" + str(round(specificity, 3))
+            if ponderation:
+                track_word_file_name += "_pond"
+        track_word_file_name += ".pkl"
+
+        # Checking if the file already exists
+        path = os.path.join(track_word_dir, track_word_file_name)
+        if track_word_file_name in os.listdir(track_word_dir):
+            print("Track word data found, loading the file...")
+            self.track_words = load_obj(path)
+        else:
+            print("Track word data not found, creating the data...")
+            if track_word_method == "common":
                 corpus_stat = Corpus_stat(self.config["gsw_corpus_path"])
                 words = corpus_stat.get_common_words(track_word_count)
-                save_obj(words, path)
-                self.track_words = words
-        elif self.config["track_word_type"] == "tfidf":
-            track_word_count = self.config["track_word_count"]
-            language = self.config["track_word_language"]
-            specificity = self.config["track_word_specificity"]
-            ponderation = self.config["track_word_ponderated"]
-            track_word_file_name = "specific_" \
-                                    + str(track_word_count) + "_" \
-                                    + str(specificity)
-            if ponderation:
-                track_word_file_name = track_word_file_name + "_pond"
-            track_word_file_name = track_word_file_name + ".pkl"
-
-            # Checking if the file already exists
-            path = os.path.join(track_word_dir_path, track_word_file_name)
-            if track_word_file_name in os.listdir(track_word_dir_path):
-                print("Track word data found, loading the file...")
-                self.track_words = load_obj(path)
             else:
-                print("Track word data not found, creating the data...")
-                corpus_32 = Corpus_32(self.config["corpus_32_dir_path"],
-                                      self.config["path_speakers"])
-                words = corpus_32.get_language_specific_words(language,
+                path_speakers = self.config["path_speakers"]
+                if not ponderation:
+                    path_speakers = None
+                corpus_manager = CorpusManager(corpus_dir,
+                                               path_speakers)
+                if track_word_method == "tfidf":
+                    words = corpus_manager.get_specific_words_tfidf(language,
                                                               specificity,
-                                                              track_word_count,
-                                                              ponderation)
-                save_obj(words, path)
-                self.track_words = words
-        elif self.config["track_word_type"] == "proportion":
-            track_word_count = self.config["track_word_count"]
-            specificity = self.config["track_word_specificity"]
-            ponderation = self.config["track_word_ponderated"]
-            track_word_file_name = "proportion_" \
-                                    + str(track_word_count) + "_" \
-                                    + str(specificity)
-            if ponderation:
-                track_word_file_name = track_word_file_name + "_pond"
-            track_word_file_name = track_word_file_name + ".pkl"
-
-            # Checking if the file already exists
-            path = os.path.join(track_word_dir_path, track_word_file_name)
-            if track_word_file_name in os.listdir(track_word_dir_path):
-                print("Track word data found, loading the file...")
-                self.track_words = load_obj(path)
-            else:
-                print("Track word data not found, creating the data...")
-                corpus_8 = Corpus_8(self.config["corpus_8_dir_path"])
-                path_speakers = None
-                if ponderation:
-                    path_speakers = self.config["path_speakers"]
-                words = corpus_8.get_gsw_specific_words(specificity,
-                                                        track_word_count,
-                                                        path_speakers)
-                save_obj(words, path)
-                self.track_words = words
-        else:
-            raise Exception("Wrong track_word_type value. Have '" \
-                            + str(self.config["track_word_type"])
-                            + "', expected either 'common' or 'specific'")
+                                                              track_word_count)
+                elif track_word_method == "proportion":
+                    words = corpus_manager.get_specific_words_prop(language,
+                                                               specificity,
+                                                               path_speakers)
+            save_obj(words, path)
+            self.track_words = words
 
         print("Initialization done")
 
