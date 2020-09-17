@@ -331,45 +331,42 @@ class Test_tweets:
         assert(approx(idx_to_loc[0][1][0], 46.6588912633543))
 
     def test_attach_gsw_location(self, tweets_obj):
-        sentences = [(0, "a"), (1, "b"), (2, "c"), (3, "d")]
-        idx_to_location = dict({0:((0,0), (10.287, 47.476), "a"),
-                                1:((0,0), (8.904, 47.484), "b"), # in CH
-                                2:((0,0), (7.652, 45.718), "c"),
-                                3:((0,0), (6.573, 47.305), "d"),
-                                4:((0,0), (16.573, 47.305), "e")})
-        res = tweets_obj._attach_gsw_location(sentences, idx_to_location, False)
-        assert(len(res) == 1 and res[0][0] == 1 and res[0][1] == "b"
-               and approx(res[0][2][0], 8.904) and approx(res[0][2][0], 47.484)
-               and res[0][3] == "b")
-        res = tweets_obj._attach_gsw_location(sentences, idx_to_location, True)
-        assert(len(res[0]) == 4)
+        sentences_pred = [(0, "a", 0.9),
+                          (1, "b", 0.95),
+                          (2, "c", 0.99),
+                          (3, "d", 0.995)]
+        idx_to_location = dict({0:((0,0), (10.287, 47.476), "foo"),
+                                1:((0,0), (8.904, 47.484), "bar"), # in CH
+                                2:((0,0), (7.652, 45.718), "foo"),
+                                3:((0,0), (6.573, 47.305), "foo"),
+                                4:((0,0), (16.573, 47.305), "foo")})
+        res = tweets_obj._attach_gsw_location(sentences_pred,
+                                              idx_to_location,
+                                              False)
+        assert(len(res) == 1
+               and res[0][0] == "b"
+               and approx(res[0][1][0], 8.904) and approx(res[0][1][0], 47.484)
+               and approx(res[0][2], 0.95)
+               and res[0][3] == "bar"
+               and res[0][4] == "2746439622"
+               and res[0][5]["id_str"] == "1246767067568787462")
 
-    def test_filter_gsw_sentences(self, tweets_obj, sentences_info):
+        #res = tweets_obj._attach_gsw_location(sentences, idx_to_location, True)
+        #assert(len(res[0]) == 4)
+
+    def test_filter_gsw_sentences(self, tweets_obj):
         tweets_obj.tweets = [dict({"user":dict({"id_str":str(i)})})
                              for i in range(20)]
-        res = tweets_obj._filter_gsw_sentences(sentences_info)
-        assert(len(res) == 2)
-        assert(len(res[0]) == 6)
-        assert(len(res[1]) == 6)
-        # Check the sentences
-        assert(res[0][0] == sentences_info[0][1])
-        assert(res[1][0] == sentences_info[4][1])
-        # Check the coordinates
-        assert(res[0][1] == sentences_info[0][2])
-        assert(res[1][1] == sentences_info[4][2])
-        # Check the prediction value
-        threshold = tweets_obj.config["lid_threshold"]
-        assert(res[0][2] >= threshold and res[0][2] <= 1.0)
-        assert(res[1][2] >= threshold and res[1][2] <= 1.0)
-        # Check the geo_source
-        assert(res[0][3] == sentences_info[0][3])
-        assert(res[1][3] == sentences_info[4][3])
-        # Check the user_id
-        assert(res[0][4] == "2")
-        assert(res[1][4] == "10")
-        # Check the tweets
-        assert(res[0][5]["user"]["id_str"] == "2")
-        assert(res[1][5]["user"]["id_str"] == "10")
+        sentences = [(0, "salut comment tu vas ?"),
+                      (1, "S Wappe zeigt links de Rhy, rächts s Sachseross"),
+                      (2, "good mording, how are you today ?")]
+        res = tweets_obj._filter_gsw_sentences(sentences)
+        assert(len(res) == 1)
+        assert(len(res[0]) == 3)
+
+        assert(res[0][0] == 1)
+        assert(res[0][1] == "S Wappe zeigt links de Rhy, rächts s Sachseross")
+        assert(isinstance(res[0][2], float))
 
     def test_write_gsw_tweets(self, tweets_obj):
         dir_path = tweets_obj.config["out_dir_tweet_processing"]

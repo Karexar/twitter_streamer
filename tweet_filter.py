@@ -23,12 +23,12 @@ from pathlib import Path
 # Define typing aliases
 Coords = Tuple[float, float]
 Sentences = List[Tuple[int, str]]
-# Sentences_info : elements are (idx, sentence, (lon, lat), geo_source)
-Sentences_info = List[Tuple[int, str, Tuple[float, float], str]]
+# Sentences_pred : elements are (idx, sentence, gsw_prediction)
+Sentences_pred = List[Tuple[int, str, float]]
 # Idx_to_location : key=idx, value = (coords object, (lon, lat), geo_source)
 Idx_to_location = Dict[int, Tuple[Any, Coords, str]]
 # GSW_tweets : elements are
-# (sentence, (lon, lat), gsw prediction, geo_source, original tweet)
+# (sentence, (lon, lat), gsw prediction, geo_source, user_id, original tweet)
 GSW_tweets = List[Tuple[str, Tuple[float, float], float, str, str, dict]]
 
 class TweetFilter:
@@ -163,7 +163,7 @@ class TweetFilter:
         """
 
         all_sub_tweets = []
-        for tweet in tqdm(tweets):
+        for tweet in tweets:
             sub_tweets = TweetFilter._extract_sub_tweets_from_tweet(tweet)
             all_sub_tweets.extend(sub_tweets)
         return all_sub_tweets
@@ -176,7 +176,7 @@ class TweetFilter:
         id, or if we already processed this tweet id in a previous batch"""
 
         filtered_tweets = []
-        for tweet in tqdm(tweets):
+        for tweet in tweets:
             if "id_str" in tweet \
             and not str(tweet["id_str"]) in self.processed_tweets_ids:
                 self.processed_tweets_ids.add(str(tweet["id_str"]))
@@ -188,7 +188,7 @@ class TweetFilter:
     @returns(List[dict])
     def _filter_geo(self, tweets: List[Dict]) -> List[Dict]:
         """Filter out tweets with no geographic data available"""
-        return [tweet for tweet in tqdm(tweets) if self.is_geo_available(tweet)]
+        return [tweet for tweet in tweets if self.is_geo_available(tweet)]
 
     @staticmethod
     @accepts(List[Dict])
@@ -202,7 +202,7 @@ class TweetFilter:
         if not isinstance(tweets, list):
             raise ValueError("'tweets' must be a list")
         sentences = []
-        for i in tqdm(range(len(tweets))):
+        for i in range(len(tweets)):
             tweet = tweets[i]
             if "extended_tweet" in tweet \
             and "full_text" in tweet["extended_tweet"]:
@@ -228,7 +228,7 @@ class TweetFilter:
         """
         print("    Specific twitter preprocessing")
         clean_texts = []
-        for sentence in tqdm(sentences):
+        for sentence in sentences:
             idx = sentence[0]
             text = sentence[1]
             # Specific twitter preprocessing (remove RT, MT, mentions, hashtags,
@@ -241,7 +241,7 @@ class TweetFilter:
         print("    Removing hat elements")
         sentences = clean_texts.copy()
         clean_texts = []
-        for sentence in tqdm(sentences):
+        for sentence in sentences:
             idx = sentence[0]
             text = Cleaner.remove_hat_element(sentence[1])
             clean_texts.append((idx, text))
@@ -250,7 +250,7 @@ class TweetFilter:
         print("    Removing smileys")
         sentences = clean_texts.copy()
         clean_texts = []
-        for sentence in tqdm(sentences):
+        for sentence in sentences:
             idx = sentence[0]
             text = Cleaner.remove_smileys(sentence[1])
             clean_texts.append((idx, text))
@@ -259,7 +259,7 @@ class TweetFilter:
         print("    Removing html entities")
         sentences = clean_texts.copy()
         clean_texts = []
-        for sentence in tqdm(sentences):
+        for sentence in sentences:
             idx = sentence[0]
             text = Cleaner.remove_html_entities(sentence[1])
             clean_texts.append((idx, text))
@@ -268,7 +268,7 @@ class TweetFilter:
         print("    Uniformizing punctuation")
         sentences = clean_texts.copy()
         clean_texts = []
-        for sentence in tqdm(sentences):
+        for sentence in sentences:
             idx = sentence[0]
             text = Cleaner.clean_punc(sentence[1])
             clean_texts.append((idx, text))
@@ -283,7 +283,7 @@ class TweetFilter:
         of a list"""
 
         normalized = []
-        for sentence in tqdm(sentences):
+        for sentence in sentences:
             idx = sentence[0]
             text = sentence[1]
             text = normalize_text(text, strip_emojis=True)
@@ -299,8 +299,8 @@ class TweetFilter:
         sentence]"""
 
         splits = [(idx, self.splitter.split(text))
-                  for idx, text in tqdm(sentences)]
-        sentences = [(idx, text) for idx, split in tqdm(splits)
+                  for idx, text in sentences]
+        sentences = [(idx, text) for idx, split in splits
                      for text in split]
         return sentences
 
@@ -316,7 +316,7 @@ class TweetFilter:
         chars_ok += " -,.?!0123456789%&\"\'()/$*+:;<=>[]\\^_{}|\\~€°²"
         chars_ok = set(chars_ok)
 
-        return [x for x in tqdm(sentences)
+        return [x for x in sentences
                 if len(set(x[1]).difference(chars_ok))==0]
 
     @staticmethod
@@ -325,7 +325,7 @@ class TweetFilter:
     def _remove_groups_of_special_chars(sentences: Sentences,
                                         from_size: int) -> Sentences:
         return [(idx, Cleaner.remove_groups_of_special_chars(text, from_size))
-                for idx, text in tqdm(sentences)]
+                for idx, text in sentences]
 
     @staticmethod
     @accepts(Sentences, int)
@@ -341,7 +341,7 @@ class TweetFilter:
         chars_ok = set(chars_ok)
 
         res = []
-        for sentence in tqdm(sentences):
+        for sentence in sentences:
             words = sentence[1].split()
             ok = True
             for word in words:
@@ -356,7 +356,7 @@ class TweetFilter:
     @returns(Sentences)
     def _remove_isolated_special_chars(sentences: Sentences) -> Sentences:
         return [(idx, Cleaner.remove_isolated_special_chars(text))
-                for idx, text in tqdm(sentences)]
+                for idx, text in sentences]
 
 
     @staticmethod
@@ -364,7 +364,7 @@ class TweetFilter:
     @returns(Sentences)
     def _remove_special_duplication(sentences: Sentences) -> Sentences:
         return [(idx, Cleaner.remove_special_duplication(text))
-                for idx, text in tqdm(sentences)]
+                for idx, text in sentences]
 
     # @staticmethod
     # @accepts(Sentences)
@@ -410,7 +410,7 @@ class TweetFilter:
         takes a list of tuple [index, sentence] as input and output the same
         list, with some elements filtered out.
         """
-        return [(idx, text) for idx, text in tqdm(sentences)
+        return [(idx, text) for idx, text in sentences
                             if self.filterer.is_valid(text)]
 
     @accepts(Any, List[int])
@@ -491,23 +491,24 @@ class TweetFilter:
         return idx_to_location
 
 
-    @accepts(Any, Sentences, Idx_to_location, Any)
-    @returns(Sentences_info)
+    @accepts(Any, Sentences_pred, Idx_to_location, Any)
+    @returns(GSW_tweets)
     def _attach_gsw_location(self,
-                             sentences: Sentences,
+                             sentences_pred: Sentences_pred,
                              idx_to_location: Idx_to_location,
                              keep_foreign=True):
-        """From a list of Sentences and a dictionary mapping an index to a
+        """From a list of Sentences_pred and a dictionary mapping an index to a
         location, attach locations to sentences. Optionally, filter out all
         locations that are not in switzerland if 'keep_foreign' == False.
         Returns the sentences with location attached.
 
         Returns
-            List[Tuple[int, str, Tuple[float, float], str]]
-                A list where each element is a tuple containing 4 elements :
-                    - Id of the tweet from where the sentence has been extracted
+            # (sentence, (lon, lat), gsw prediction, geo_source, original tweet)
+            List[Tuple[str, Tuple[float, float], float, str, str, dict]]
+                A list where each element is a tuple containing 5 elements :
                     - The sentence
                     - The coordinates of the user location
+                    - The gsw prediction
                     - The source of the coordinates, can be
                         * GPS : the original tweets contains GPS coordinates
                         * Twitter_place : the original tweets contains a twitter
@@ -517,28 +518,32 @@ class TweetFilter:
                         * Geocoder_CH_word : the coordinates were retrievec by
                           querying locationiq with a CH word (city name, postal
                           code...) found in the user.location field
-                        * "" : No location available"""
-        sentences_info = []
-        for sentence in tqdm(sentences):
-            tweet_id = sentence[0]
+                        * "" : No location available
+                    - The raw tweet object corresponding to the sentence
+        """
+        gsw_tweets = []
+        for sentence_pred in sentences_pred:
+            tweet_id = sentence_pred[0]
             coords = idx_to_location[tweet_id][1]
             geo_source = idx_to_location[tweet_id][2]
             if keep_foreign \
             or self.geocoder.are_coords_in_switzerland(coords):
-                sentences_info.append((tweet_id,
-                                       sentence[1],
-                                       coords,
-                                       geo_source))
+                gsw_tweets.append((sentence_pred[1],
+                                   coords,
+                                   sentence_pred[2],
+                                   geo_source,
+                                   self.tweets[tweet_id]["user"]["id_str"],
+                                   self.tweets[tweet_id]))
 
-        return sentences_info
+        return gsw_tweets
 
-    @accepts(Any, Sentences_info)
-    @returns(GSW_tweets)
-    def _filter_gsw_sentences(self, sentences_info):
+    @accepts(Any, Sentences)
+    @returns(Sentences_pred)
+    def _filter_gsw_sentences(self, sentences):
         """Filter out all sentences that are not detected as Swiss-German
         """
         # Predict Swiss-German
-        sentences_list = [sentence[1] for sentence in sentences_info]
+        sentences_list = [sentence[1] for sentence in sentences]
         predictions = []
         # separate in batches to avoid cuda out of memory error
         for i in tqdm(range(math.ceil(len(sentences_list)/100))):
@@ -553,31 +558,22 @@ class TweetFilter:
 
         # Create the gsw_tweet object for each prediction that exceeds a
         # threshold
-        gsw_tweets = []
-        for i in tqdm(range(len(sentences_info))):
+        filtered = []
+        for i in range(len(sentences)):
             prediction = float(predictions[i])
             if prediction >= self.config["lid_threshold"]:
-                sentence = sentences_info[i][1]
-                coords = sentences_info[i][2]
-                geo_source = sentences_info[i][3]
-                tweet = self.tweets[sentences_info[i][0]]
-                user_id = str(tweet["user"]["id_str"])
-                gsw_tweets.append((sentence,
-                                   coords,
-                                   prediction,
-                                   geo_source,
-                                   user_id,
-                                   tweet))
+                filtered.append((sentences[i][0], sentences[i][1], prediction))
+
         del(predictions)
         gc.collect()
         cuda.empty_cache()
-        return gsw_tweets
+        return filtered
 
     @accepts(Any, GSW_tweets)
     @returns(GSW_tweets)
     def _remove_non_gsw_accent(self, gsw_tweets):
         return [(Cleaner.remove_non_gsw_accent(x[0]), x[1],x[2],x[3],x[4],x[5])
-                for x in tqdm(gsw_tweets)]
+                for x in gsw_tweets]
 
     @accepts(Any, GSW_tweets)
     @returns(None)
@@ -607,7 +603,7 @@ class TweetFilter:
                          index_col="user_id")
         df.index = df.index.map(str)
         new_users_count = 0
-        for gsw_tweet in tqdm(gsw_tweets):
+        for gsw_tweet in gsw_tweets:
              prediction = gsw_tweet[2]
              current_user_id = gsw_tweet[4]
              if prediction >= self.config["threshold_new_sg_user"]:
@@ -624,7 +620,7 @@ class TweetFilter:
     def _update_processed_tweets(self):
         """Update the processed tweets ids."""
         with open(self.config["processed_tweets_ids_path"], "a", encoding="utf8") as f:
-            for id in tqdm(self.new_tweets_ids):
+            for id in self.new_tweets_ids:
                 f.write(str(id) + "\n")
         self.new_tweets_ids = set()
 
@@ -729,21 +725,22 @@ class TweetFilter:
                     sentences = self._filter_valid_sentences(sentences)
                     print(f"  => {len(sentences)} well formed sentences")
 
+                    print("Filtering gsw...")
+                    # sentences_pred: elements are (idx, sentence, prediction)
+                    sentences_pred = self._filter_gsw_sentences(sentences)
+                    print(f"  => {len(sentences_pred)} gsw sentences found")
+                    cur_gsw_fetched[source] += len(sentences_pred)
+
                     print("Geocoding...")
-                    indices = [x[0] for x in sentences]
+                    indices = [x[0] for x in sentences_pred]
                     idx_to_location = self._geocode_tweets(indices)
-                    sentences_info = self._attach_gsw_location(
-                                        sentences,
+                    gsw_tweets = self._attach_gsw_location(
+                                        sentences_pred,
                                         idx_to_location,
                                         self.config["keep_foreign_location"])
                     if not self.config["keep_foreign_location"]:
-                        print(f"  => {len(sentences_info)} sentences " +
+                        print(f"  => {len(gsw_tweets)} sentences " +
                               "geolocalized in Switzerland")
-
-                    print("Filtering gsw...")
-                    gsw_tweets = self._filter_gsw_sentences(sentences_info)
-                    print(f"  => {len(gsw_tweets)} gsw sentences were found")
-                    cur_gsw_fetched[source] += len(gsw_tweets)
 
                     print("Removing non gsw accents")
                     gsw_tweets = self._remove_non_gsw_accent(gsw_tweets)
