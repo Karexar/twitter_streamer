@@ -141,11 +141,7 @@ ch_polygon:
 # language. This is to ponderate the score of language-specific words.
 path_speakers: "data/speakers.csv"
 # directory path containing the leipzig corpus of 32 languages
-corpus_32_dir_path: "data/leipzig_32"
-# directory path containing the leipzig corpus of 8 languages
-# (GSW, German, and 6 GSW-like languages). This can be same as
-# corpus_32_dir_path because it is a subset of the 32 languages.
-corpus_8_dir_path: "data/leipzig_32"
+corpus_dir_path: "data/leipzig_32"
 
 ###############################################################################
 # streamer
@@ -155,7 +151,7 @@ dir_path_log: "log"
 # time interval (s) to wait before processing raw tweets and fetching users
 time_interval_search_users: 86400
 # tweet count to write in a single file when streaming
-raw_tweets_stream_batch_size: 5000
+raw_tweets_stream_batch_size: 100
 # tweet count to write in a single file when searching for user's tweets
 raw_tweets_search_batch_size: 4000
 # gsw tweet count threshold (i.e. how much gsw tweet a user needs to have
@@ -168,19 +164,15 @@ min_days_to_fetch: 7
 # twitter api (for streaming tweet). It is a list of languages on which to
 # filter.
 filter_languages:
-    - "de"
+#    - "de"
 # Swiss-german corpus path, will be used to compute the most common words in
 # swiss-german
 gsw_corpus_path: "data/leipzig_32/gsw_swisstext_leipzig.txt"
-# the directory path that contains specific swiss-german words
-# the data in this directory is generated automatically, according to the next
-# variables
-track_word_dir_path: "data/track_words"
 # choose whether we want the most common words, or the most specific words
 # in case of the most specific words, TF-IDF is used on 32 languages
 # and we keep the words where the gsw TF-IDF score is the highest, providing the
 # word has enough specificity (see track_word_specificity)
-track_word_type: "proportion" # either "common" or "tfidf" or "proportion"
+track_word_method: "proportion" # either "common" or "tfidf" or "proportion"
 # the count of common words to get (400 is the maximum for twitter queries)
 track_word_count: 400
 # which language we want to compute the most common words
@@ -194,7 +186,7 @@ track_word_language: "gsw"
 # If the specificity is too high, then coverage is low
 # If the specifitiy is too low, then a lot of non swiss-german tweets are
 # listened.
-track_word_specificity: 0.2
+track_word_specificity: 0.25
 # Add a ponderation to the TF-IDF score corresponding to the number of speakers
 # for each language. Motivation : suppose a word very representative of both
 # Swiss-German and a language with 100k speakers. It may have a low TF-IDF score

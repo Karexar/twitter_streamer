@@ -19,6 +19,7 @@ class Corpus_stat:
         self.word_distrib = None
         self.vocab = None
         self.sentences_set = None
+        self.full_str = self._corpus_to_string()
 
     def _isolate_words(sentence):
         words = sentence.split()
@@ -53,8 +54,7 @@ class Corpus_stat:
         the word distribution needs to be computed.
         """
         distrib = dict()
-        full_str = self._corpus_to_string()
-        self.word_distrib = pd.Series(full_str.split()) \
+        self.word_distrib = pd.Series(self.full_str.split()) \
                               .value_counts() \
                               .sort_values(ascending=False)
         if self.vocab is None:
@@ -72,8 +72,7 @@ class Corpus_stat:
     def get_vocabulary(self):
         """Return the set of words that appear in the corpus"""
         if not self.vocab:
-            full_str = self._corpus_to_string()
-            self.vocab = set(full_str.split())
+            self.vocab = set(self.full_str.split())
         return self.vocab
 
     def get_coverage(self, words):

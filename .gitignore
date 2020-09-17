@@ -11,6 +11,7 @@ __pycache__
 /out_process/*
 !/out_process/readme.md
 /data/leipzig_32
+/data/leipzig_8
 !/data/leipzig_32/readme.md
 /data/loc_to_coords.txt
 /data/processed_ids.txt
